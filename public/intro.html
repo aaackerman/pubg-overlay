@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Starting Soon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: block;
+      filter: contrast(1.08) saturate(1.2);
+    }
+
+    /* ── Vignette ─────────────────────────────────── */
+    #vignette {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: radial-gradient(ellipse at center,
+        transparent 38%,
+        rgba(0,0,10,0.55) 72%,
+        rgba(0,0,8,0.88) 100%
+      );
+      pointer-events: none;
+      z-index: 8;
+    }
+
+    /* ── Title area ───────────────────────────────── */
+    #overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /*
+      Container controls blur only.
+      Individual .letter spans control their own opacity + transform.
+    */
+    #name-text {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(30px, 4.8vw, 66px);
+      font-weight: 900;
+      letter-spacing: 0.30em;
+      text-transform: uppercase;
+      color: #ddeeff;
+      filter: blur(10px);
+      text-shadow:
+        0 0 14px rgba(70, 140, 255, 0.8),
+        0 0 50px rgba(30, 80, 220, 0.35);
+      padding-right: 0.30em;
+      margin-bottom: 22px;
+      display: flex;
+      justify-content: center;
+      align-items: baseline;
+      gap: 0.02em;
+      will-change: filter, opacity;
+    }
+
+    .letter {
+      display: inline-block;
+      opacity: 0;
+      will-change: opacity, transform;
+    }
+
+    #starting-soon {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: clamp(10px, 1.25vw, 16px);
+      letter-spacing: 0.65em;
+      text-transform: uppercase;
+      color: rgba(110, 165, 255, 0.88);
+      opacity: 0;
+      filter: blur(10px);
+      padding-right: 0.65em;
+      will-change: opacity, filter;
+    }
+
+    /* ── Countdown — fixed bottom-center, visible from start ─── */
+    #countdown {
+      position: fixed;
+      bottom: 8%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: clamp(22px, 2.8vw, 42px);
+      letter-spacing: 0.20em;
+      color: rgba(140, 190, 255, 0.92);
+      opacity: 0;
+      font-variant-numeric: tabular-nums;
+      text-shadow:
+        0 0 10px rgba(80, 150, 255, 1.0),
+        0 0 32px rgba(40, 110, 255, 0.6),
+        0 0 75px rgba(20, 65, 220, 0.3);
+      pointer-events: none;
+      z-index: 10;
+      will-change: opacity;
+    }
+
+    /* ── Film grain ──────────────────────────────── */
+    #grain {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 9;
+      opacity: 0.008;
+      mix-blend-mode: screen;
+    }
+
+    /* ── Final fade to black ─────────────────────── */
+    #fade-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: #000;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="vignette"></div>
+  <canvas id="grain"></canvas>
+
+  <div id="overlay">
+    <div id="name-text"><!-- letters injected by main.js --></div>
+    <div id="starting-soon">Starting Soon</div>
+  </div>
+
+  <div id="countdown">05:00</div>
+  <div id="fade-overlay"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="/intro/js/scene.js"></script>
+  <script src="/intro/js/timer.js"></script>
+  <script src="/intro/js/animation.js"></script>
+  <script src="/intro/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PUBG Stream Overlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --blue:       #4fc3f7;
+    --blue-dim:   rgba(79, 195, 247, 0.55);
+    --panel-bg:   rgba(8, 10, 16, 0.58);
+    --panel-border: rgba(255, 255, 255, 0.07);
+    --divider:    rgba(255, 255, 255, 0.06);
+    --text:       #ffffff;
+    --text-dim:   rgba(255, 255, 255, 0.75);
+    --accent-line: 2px solid rgba(79, 195, 247, 0.7);
+    --font-main:  'Rajdhani', sans-serif;
+    --font-mono:  'Share Tech Mono', monospace;
+    --blur:       blur(18px);
+    --radius:     5px;
+  }
+
+  body {
+    width: 1920px;
+    height: 1080px;
+    background: transparent;
+    overflow: hidden;
+    font-family: var(--font-main);
+    color: var(--text);
+    position: relative;
+    transform-origin: top left;
+  }
+
+  /* ─── SESSION STRIP ─── */
+  #session-strip {
+    position: absolute;
+    top: 300px;
+    left: 0;
+    height: 44px;
+    width: 500px; /* fixed — prevents layout shift when cycling stat changes */
+    background: var(--panel-bg);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+    border: 1px solid var(--panel-border);
+    border-left: var(--accent-line);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    display: flex;
+    align-items: stretch;
+    animation: slideIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes slideIn {
+    from { transform: translateX(-100%); opacity: 0; }
+    to   { transform: translateX(0);     opacity: 1; }
+  }
+
+  .stat-cell {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: 8px 16px 0;
+    border-right: 1px solid var(--divider);
+  }
+  .stat-cell:last-child { border-right: none; padding-right: 18px; }
+
+  .stat-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-dim);
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+  }
+  .stat-value {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1;
+    transition: color 0.25s ease;
+  }
+  .stat-sub {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-dim);
+    margin-left: 3px;
+  }
+  .stat-value.updated {
+    animation: countUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes countUp {
+    0%   { opacity: 0.3; transform: translateY(6px); color: var(--blue); }
+    100% { opacity: 1;   transform: translateY(0);   color: var(--text); }
+  }
+
+  /* cycling stat transition */
+  .stat-value.cycling-out {
+    animation: cycleOut 0.18s ease both;
+  }
+  .stat-value.cycling-in {
+    animation: cycleIn 0.28s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  .stat-label.cycling-out { animation: cycleOut 0.18s ease both; }
+  .stat-label.cycling-in  { animation: cycleIn 0.28s cubic-bezier(0.16,1,0.3,1) both; }
+  @keyframes cycleOut {
+    to { opacity: 0; transform: translateY(-5px); }
+  }
+  @keyframes cycleIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ─── SLUMP MODE ─── */
+  #slump-mode {
+    position: absolute;
+    top: 248px;
+    left: 0;
+    background: var(--panel-bg);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+    border: 1px solid var(--panel-border);
+    border-left: var(--accent-line);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 7px 18px;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    animation: slideIn 0.4s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  #slump-mode.show { display: flex; }
+  .slump-text {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+  }
+
+  /* ─── STREAK MODE ─── */
+  #streak-mode {
+    position: absolute;
+    top: 248px;
+    left: 0;
+    background: var(--panel-bg);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+    border: 1px solid var(--panel-border);
+    border-left: 2px solid rgba(255, 200, 50, 0.8);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 7px 18px;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    animation: slideIn 0.4s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  #streak-mode.show { display: flex; }
+  .streak-text {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: rgba(255, 200, 50, 0.9);
+  }
+  .streak-emoji {
+    display: inline-block;
+    animation: firePulse 1.9s ease-in-out infinite;
+    transform-origin: center bottom;
+  }
+  @keyframes firePulse {
+    0%   { transform: scale(1)    rotate(-4deg); filter: brightness(1)   drop-shadow(0 0 4px rgba(255,160,0,0.5)); }
+    30%  { transform: scale(1.22) rotate(3deg);  filter: brightness(1.4) drop-shadow(0 0 10px rgba(255,200,0,0.9)); }
+    60%  { transform: scale(1.08) rotate(-2deg); filter: brightness(1.1) drop-shadow(0 0 6px rgba(255,140,0,0.6)); }
+    100% { transform: scale(1)    rotate(-4deg); filter: brightness(1)   drop-shadow(0 0 4px rgba(255,160,0,0.5)); }
+  }
+
+  /* ─── SQUAD CARRY PANEL ─── */
+  #squad-panel {
+    position: absolute;
+    top: 660px;
+    left: 0;
+    width: 260px;
+    background: var(--panel-bg);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+    border: 1px solid var(--panel-border);
+    border-left: var(--accent-line);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 8px 14px 8px 12px;
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+    animation: slideIn 0.55s 0.1s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  #squad-panel.show { display: flex; }
+
+  .squad-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+  }
+  .squad-header-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.6px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .squad-cycle-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.4px;
+    color: var(--text-dim);
+  }
+
+  .squad-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .squad-carry-crown {
+    font-size: 14px;
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+    opacity: 1;
+    transform: translateY(-3px);
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.85)) drop-shadow(0 0 3px rgba(0,0,0,0.6));
+  }
+  .squad-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.6);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .squad-name.is-you { color: var(--text); font-weight: 600; }
+  .squad-row.carry .squad-name { color: var(--text); }
+  .squad-val {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: rgba(255,255,255,0.55);
+    min-width: 32px;
+    text-align: right;
+  }
+  .squad-row.carry .squad-val { color: var(--text); }
+  .squad-bar-wrap {
+    width: 40px;
+    height: 2px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .squad-bar {
+    height: 100%;
+    background: rgba(79,195,247,0.5);
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+  .squad-row.carry .squad-bar { background: var(--blue); }
+
+  #squad-rows { transition: opacity 0.18s ease, transform 0.18s ease; }
+  #squad-rows.cycling-out { opacity: 0; transform: translateY(-4px); }
+  #squad-rows.cycling-in  { animation: squadIn 0.28s cubic-bezier(0.16,1,0.3,1) both; }
+  @keyframes squadIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<!-- SESSION STRIP -->
+<div id="session-strip">
+  <div class="stat-cell">
+    <div class="stat-label">KILLS</div>
+    <div class="stat-value" id="s-kills">0</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-label">TOP10</div>
+    <div class="stat-value" id="s-top10">0</div>
+  </div>
+  <div class="stat-cell" style="min-width:90px;">
+    <div class="stat-label">WINS</div>
+    <div class="stat-value" id="s-wins">0</div>
+  </div>
+  <div class="stat-cell" style="min-width:100px; overflow:hidden;">
+    <div class="stat-label" id="s-cycle-label">HEADSHOTS</div>
+    <div class="stat-value" id="s-cycle-val">–</div>
+  </div>
+  <div class="stat-cell" style="min-width:0;">
+    <div class="stat-label">BEST GUN TODAY</div>
+    <div class="stat-value" id="s-weapon" style="white-space:nowrap;">–</div>
+  </div>
+</div>
+
+<!-- SQUAD CARRY PANEL -->
+<div id="squad-panel">
+  <div class="squad-header">
+    <div class="squad-header-label" id="squad-mode-label">SQUAD · SESSION</div>
+    <div class="squad-cycle-label" id="squad-cycle-label">KILLS</div>
+  </div>
+  <div id="squad-rows"></div>
+</div>
+
+<!-- SLUMP MODE -->
+<div id="slump-mode">
+  <span style="font-size:18px;">💤</span>
+  <span class="slump-text">IN THE SLUMP · 3 MATCHES · NO KILLS</span>
+</div>
+
+<!-- STREAK MODE -->
+<div id="streak-mode">
+  <span class="streak-emoji" style="font-size:18px;">🔥</span>
+  <span class="streak-text">ON FIRE · 3 WINS IN A ROW</span>
+</div>
+
+<script>
+// ─────────────────────────────────────────
+//  DOM REFS / HELPERS
+// ─────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+// Escape any string before it's interpolated into innerHTML. PUBG IGNs are
+// almost always alphanumeric, but ?player= lets you load arbitrary names —
+// belt-and-suspenders so an exotic name can never inject markup.
+const esc = s => String(s).replace(/[&<>"']/g, c => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+));
+
+// ─────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────
+const state = {
+  // Populated from server's sessionTotals — source of truth for today's stats
+  kills: 0, wins: 0, top10s: 0, matches: 0,
+  headshots: 0, longestKill: 0,
+  zeroKillRun: 0, winStreak: 0,
+  weaponTally: {},
+  lastPlace: null,
+  playerName: null,
+  processedMatchIds: new Set(),
+};
+
+// ── Cycling stat cell ──────────────────────
+const CYCLE_STATS = ['HSK %', 'AVG K/MATCH', 'LONGEST', 'LAST MATCH'];
+let cycleIdx = 0;
+
+function renderCycleStat(animate = false) {
+  const label = $('s-cycle-label');
+  const val   = $('s-cycle-val');
+  if (!label || !val) return;
+
+  function applyContent() {
+    label.textContent = CYCLE_STATS[cycleIdx];
+    switch (CYCLE_STATS[cycleIdx]) {
+      case 'HSK %':        val.textContent = state.kills > 0
+        ? `${Math.round((state.headshots / state.kills) * 100)}%` : '–'; break;
+      case 'AVG K/MATCH': val.textContent = state.matches > 0
+        ? (state.kills / state.matches).toFixed(1) : '–'; break;
+      case 'LONGEST':     val.textContent = state.longestKill > 0
+        ? `${Math.round(state.longestKill)}m` : '–'; break;
+      case 'LAST MATCH':  val.textContent = state.lastPlace !== null
+        ? `#${state.lastPlace}` : '–'; break;
+    }
+  }
+
+  if (!animate) { applyContent(); return; }
+
+  // Slide out, update, slide in
+  label.classList.add('cycling-out');
+  val.classList.add('cycling-out');
+  setTimeout(() => {
+    applyContent();
+    label.classList.remove('cycling-out');
+    val.classList.remove('cycling-out');
+    label.classList.add('cycling-in');
+    val.classList.add('cycling-in');
+    setTimeout(() => {
+      label.classList.remove('cycling-in');
+      val.classList.remove('cycling-in');
+    }, 300);
+  }, 180);
+}
+
+// Master clock — both panels animate in sync
+const CYCLE_INTERVAL = 7000;
+setInterval(() => {
+  cycleIdx      = (cycleIdx      + 1) % CYCLE_STATS.length;
+  squadCycleIdx = (squadCycleIdx + 1) % getActiveSquadCycle().length;
+  renderCycleStat(true);
+  renderSquadPanel(true);
+}, CYCLE_INTERVAL);
+
+// ─────────────────────────────────────────
+//  UPDATE SESSION STRIP
+// ─────────────────────────────────────────
+function updateStrip(field, value) {
+  const el = $(field);
+  if (!el) return;
+  const prev = el.textContent;
+  el.textContent = value;
+  if (prev !== String(value)) {
+    el.classList.remove('updated');
+    void el.offsetWidth; // force reflow to restart animation
+    el.classList.add('updated');
+    setTimeout(() => el.classList.remove('updated'), 500);
+  }
+}
+
+function renderStrip() {
+  updateStrip('s-kills', state.kills);
+  const winRate = state.matches > 0 ? Math.round((state.wins / state.matches) * 100) : 0;
+  const winsEl = $('s-wins');
+  if (winsEl) winsEl.innerHTML = state.matches > 0
+    ? `${state.wins}<span class="stat-sub">(${winRate}%)</span>`
+    : '0';
+  updateStrip('s-top10', state.top10s);
+  renderCycleStat();
+
+  const best = getBestWeapon();
+  const weapEl = $('s-weapon');
+  if (weapEl) weapEl.innerHTML = best
+    ? `${esc(best.name)}<span class="stat-sub">(${best.kills})</span>`
+    : '–';
+}
+
+function getBestWeapon() {
+  const entries = Object.entries(state.weaponTally);
+  if (!entries.length) return null;
+  entries.sort((a, b) => b[1] - a[1]);
+  return { name: entries[0][0], kills: entries[0][1] };
+}
+
+// ─────────────────────────────────────────
+//  SLUMP MODE
+// ─────────────────────────────────────────
+function checkSlump() {
+  const el = $('slump-mode');
+  if (state.zeroKillRun >= 3) {
+    el.querySelector('.slump-text').textContent =
+      `IN THE SLUMP · ${state.zeroKillRun} MATCHES · NO KILLS`;
+    el.classList.add('show');
+  } else {
+    el.classList.remove('show');
+  }
+}
+
+function checkStreak() {
+  const el = $('streak-mode');
+  if (state.winStreak >= 3) {
+    el.querySelector('.streak-text').textContent =
+      `ON FIRE · ${state.winStreak} WINS IN A ROW`;
+    el.classList.add('show');
+  } else {
+    el.classList.remove('show');
+  }
+}
+
+// ─────────────────────────────────────────
+//  SQUAD CARRY PANEL
+// ─────────────────────────────────────────
+const SQUAD_CYCLE = ['KILLS', 'DAMAGE', 'TEAM KILLS'];
+let squadCycleIdx  = 0;
+let squadData      = {};   // { name: { kills, damage, teamKills } }
+
+function getActiveSquadCycle() {
+  const hasTeamKills = Object.values(squadData).some(s => (s.teamKills || 0) > 0);
+  return hasTeamKills ? SQUAD_CYCLE : SQUAD_CYCLE.filter(m => m !== 'TEAM KILLS');
+}
+
+function renderSquadPanel(animate = false) {
+  const entries = Object.entries(squadData);
+  if (entries.length < 2) {
+    $('squad-panel').classList.remove('show');
+    return;
+  }
+
+  const modeLabel = entries.length === 2 ? 'DUO · SESSION' : 'SQUAD · SESSION';
+  $('squad-mode-label').textContent = modeLabel;
+
+  function applyRows() {
+    const activeCycle = getActiveSquadCycle();
+    const metric = activeCycle[squadCycleIdx % activeCycle.length];
+    $('squad-cycle-label').textContent = metric;
+
+    const key    = metric === 'KILLS' ? 'kills'
+                 : metric === 'DAMAGE' ? 'damage'
+                 : 'teamKills';
+    const sorted = entries
+      .map(([name, s]) => ({
+        name,
+        kills:     s.kills     || 0,
+        damage:    s.damage    || 0,
+        teamKills: s.teamKills || 0,
+        val:       s[key]      || 0,
+      }))
+      .sort((a, b) => b.val - a.val);
+    const maxVal = sorted[0].val || 1;
+
+    $('squad-rows').innerHTML = sorted.map((p, i) => {
+      const isTopTK = metric === 'TEAM KILLS' && i === 0 && p.val > 0;
+      const isCarry = i === 0 && p.val > 0;
+      const isYou   = state.playerName
+        ? p.name.toLowerCase() === state.playerName.toLowerCase()
+        : false;
+      const pct     = Math.round((p.val / maxVal) * 100);
+      const display = metric === 'DAMAGE' ? p.val.toLocaleString() : p.val;
+      const marker  = isTopTK ? '☠️' : (isCarry ? '👑' : '');
+      return `
+        <div class="squad-row${isCarry ? ' carry' : ''}">
+          <div class="squad-carry-crown">${marker}</div>
+          <div class="squad-name${isYou ? ' is-you' : ''}">${esc(p.name)}</div>
+          <div class="squad-bar-wrap"><div class="squad-bar" style="width:${pct}%"></div></div>
+          <div class="squad-val">${esc(display)}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  if (!animate) {
+    applyRows();
+  } else {
+    const rows = $('squad-rows');
+    rows.classList.add('cycling-out');
+    setTimeout(() => {
+      applyRows();
+      rows.classList.remove('cycling-out');
+      rows.classList.add('cycling-in');
+      setTimeout(() => rows.classList.remove('cycling-in'), 300);
+    }, 180);
+  }
+
+  $('squad-panel').classList.add('show');
+}
+
+function updateSquadData(totals) {
+  if (!totals || Object.keys(totals).length < 2) return;
+  squadData = totals;
+  renderSquadPanel();
+}
+
+// ─────────────────────────────────────────
+//  PROCESS A COMPLETED MATCH
+// ─────────────────────────────────────────
+function processMatch(matchData) {
+  if (state.processedMatchIds.has(matchData.id)) return;
+  state.processedMatchIds.add(matchData.id);
+
+  const placement = matchData.participant.stats.winPlace || 100;
+  state.lastPlace = placement;
+
+  renderStrip();
+  checkSlump();
+  checkStreak();
+}
+
+function processMatchFull(data) {
+  // In live mode, poll() already synced sessionTotals before calling here.
+  // In demo mode there's no sessionTotals — accumulate from match stats directly.
+  if (!data.sessionTotals) {
+    const s = data.match?.participant?.stats || {};
+    state.kills      += s.kills || 0;
+    state.wins       += (s.winPlace === 1)  ? 1 : 0;
+    state.top10s     += (s.winPlace <= 10)  ? 1 : 0;
+    state.matches++;
+    state.headshots  += s.headshotKills || 0;
+    state.longestKill = Math.max(state.longestKill, s.longestKill || 0);
+    (data.telemetryKills || []).forEach(k => {
+      const w = k.weapon || 'Unknown';
+      state.weaponTally[w] = (state.weaponTally[w] || 0) + 1;
+    });
+  }
+  if (data.squadTotals) updateSquadData(data.squadTotals);
+  processMatch(data.match);
+}
+
+// ─────────────────────────────────────────
+//  POLL SERVER (Node.js backend on port 3001)
+// ─────────────────────────────────────────
+const params = new URLSearchParams(window.location.search);
+const watchUser = params.get('player');
+const latestUrl = watchUser
+  ? `http://localhost:3001/latest?player=${encodeURIComponent(watchUser)}`
+  : 'http://localhost:3001/latest';
+
+async function poll() {
+  try {
+    const res = await fetch(latestUrl);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data) return;
+
+    if (data.playerName) state.playerName = data.playerName;
+
+    // Always sync session totals — day accumulation finishes in background
+    // and the next poll should reflect it even if matchId hasn't changed
+    if (data.sessionTotals) {
+      const t = data.sessionTotals;
+      state.kills       = t.kills;
+      state.wins        = t.wins;
+      state.top10s      = t.top10s;
+      state.matches     = t.matches;
+      state.headshots   = t.headshots;
+      state.longestKill = t.longestKill;
+      state.zeroKillRun = t.zeroKillRun;
+      state.winStreak   = t.winStreak || 0;
+      state.weaponTally = t.weaponTally || {};
+      renderStrip();
+    }
+    if (data.squadTotals) updateSquadData(data.squadTotals);
+
+    // Only fire animations for genuinely new matches
+    if (data.matchId && !state.processedMatchIds.has(data.matchId)) {
+      processMatchFull(data);
+    }
+  } catch (e) {
+    // backend not running yet – silent fail
+  }
+}
+
+// ─────────────────────────────────────────
+//  SLUMP DEMO MODE (runs when ?demo=slump in URL)
+// ─────────────────────────────────────────
+function runDemoFire() {
+  console.log('Fire demo mode active');
+  const win = (id, run) => {
+    state.winStreak   = run;
+    state.zeroKillRun = 0;
+    state.matches     = run;
+    processMatchFull({
+      matchId: id,
+      match: { id, participant: { stats: { kills: 5, damageDealt: 800, winPlace: 1, headshotKills: 2, longestKill: 150 } } },
+      telemetryKills: [],
+      squadTotals: { 'You': { kills: 5, damage: 800 }, 'Player2': { kills: 3, damage: 450 }, 'Player3': { kills: 2, damage: 310 } },
+    });
+  };
+  setTimeout(() => win('fire-1', 1), 500);
+  setTimeout(() => win('fire-2', 2), 1500);
+  setTimeout(() => win('fire-3', 3), 2500);
+}
+
+function runDemoSlump() {
+  console.log('Slump demo mode active');
+  const zeroKill = (id, place, run) => {
+    state.zeroKillRun = run;
+    state.matches     = run;
+    processMatchFull({
+      matchId: id,
+      match: { id, participant: { stats: { kills: 0, damageDealt: 180, winPlace: place, headshotKills: 0, longestKill: 0 } } },
+      telemetryKills: [],
+      squadTotals: { 'You': { kills: 0, damage: 180 }, 'Player2': { kills: 3, damage: 450 }, 'Player3': { kills: 1, damage: 210 } },
+    });
+  };
+  setTimeout(() => zeroKill('slump-1', 12, 1), 500);
+  setTimeout(() => zeroKill('slump-2', 22, 2), 1500);
+  setTimeout(() => zeroKill('slump-3', 31, 3), 2500);
+}
+
+// ─────────────────────────────────────────
+//  DEMO MODE (runs when ?demo=1 in URL)
+// ─────────────────────────────────────────
+function runDemo() {
+  console.log('Demo mode active');
+
+  // Fake a normal match
+  setTimeout(() => {
+    processMatchFull({
+      matchId: 'demo-match-1',
+      match: {
+        id: 'demo-match-1',
+        participant: {
+          stats: { kills: 4, damageDealt: 612, winPlace: 3, headshotKills: 2, longestKill: 187 }
+        }
+      },
+      telemetryKills: [
+        { weapon: 'M416', victim: 'PlayerXX',  distance: 120, isHeadshot: false },
+        { weapon: 'M416', victim: 'StormRider', distance: 89,  isHeadshot: true  },
+        { weapon: 'AWM',  victim: 'GhostFire',  distance: 187, isHeadshot: true  },
+        { weapon: 'M416', victim: 'NightOwl99', distance: 43,  isHeadshot: false },
+      ],
+      squadTotals: {
+        'You': { kills: 4,  damage: 612 },
+        'Player2':      { kills: 6,  damage: 820 },
+        'Player3':   { kills: 2,  damage: 310 },
+        'Player4':   { kills: 1,  damage: 180 },
+      },
+    });
+  }, 1500);
+
+  // Fake a CHICKEN DINNER
+  setTimeout(() => {
+    processMatchFull({
+      matchId: 'demo-match-2',
+      match: {
+        id: 'demo-match-2',
+        participant: {
+          stats: { kills: 7, damageDealt: 980, winPlace: 1, headshotKills: 3, longestKill: 210 }
+        }
+      },
+      telemetryKills: [
+        { weapon: 'AWM',  victim: 'SniperKing',  distance: 210, isHeadshot: true  },
+        { weapon: 'AWM',  victim: 'ProPlayer88', distance: 195, isHeadshot: false },
+        { weapon: 'M249', victim: 'Rusher007',   distance: 55,  isHeadshot: false },
+      ],
+      squadTotals: {
+        'You': { kills: 11, damage: 1592 },
+        'Player2':      { kills: 9,  damage: 1140 },
+        'Player3':   { kills: 4,  damage: 590  },
+        'Player4':   { kills: 2,  damage: 270  },
+      },
+    });
+  }, 16000);
+}
+
+// ─────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────
+renderStrip();
+
+if (params.get('demo') === 'slump') {
+  state.playerName = 'You';
+  runDemoSlump();
+} else if (params.get('demo') === 'fire') {
+  state.playerName = 'You';
+  runDemoFire();
+} else if (params.get('demo') === '1') {
+  state.playerName = 'You';
+  runDemo();
+} else {
+  // Live polling every 60 seconds
+  poll();
+  setInterval(poll, 60000);
+}
+
+// Scale the 1920×1080 canvas to fit the browser window (no-op in OBS where scale = 1)
+function fitToViewport() {
+  const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+  document.body.style.transform = `scale(${scale})`;
+}
+fitToViewport();
+window.addEventListener('resize', fitToViewport);
+</script>
+</body>
+</html>
